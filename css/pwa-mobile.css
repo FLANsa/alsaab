@@ -1,0 +1,87 @@
+/**
+ * PWA / Mobile styles - ياسر للاتصالات
+ * Safe areas, touch targets, readability on small screens
+ */
+
+/* Safe area for notched devices (iPhone X+, etc.) */
+@supports (padding: env(safe-area-inset-top)) {
+  body {
+    padding-left: env(safe-area-inset-left);
+    padding-right: env(safe-area-inset-right);
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+  nav.navbar {
+    padding-top: env(safe-area-inset-top);
+    padding-left: env(safe-area-inset-left);
+    padding-right: env(safe-area-inset-right);
+  }
+  /* When navbar is fixed, add safe-area to body top so content is not under notch */
+  body {
+    padding-top: calc(70px + env(safe-area-inset-top)) !important;
+  }
+}
+
+/* Mobile: touch targets and readability */
+@media (max-width: 768px) {
+  body {
+    font-size: 16px;
+    -webkit-text-size-adjust: 100%;
+  }
+
+  /* Minimum touch target ~44px */
+  .btn,
+  .nav-link,
+  .dropdown-item,
+  a.btn {
+    min-height: 44px;
+    min-width: 44px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0.5rem 1rem;
+  }
+
+  .navbar-toggler {
+    min-width: 44px;
+    min-height: 44px;
+    padding: 0.5rem;
+  }
+
+  .form-control,
+  .form-select {
+    min-height: 44px;
+    font-size: 16px;
+  }
+
+  /* Spacing for content */
+  .container,
+  .container-fluid {
+    padding-left: 1rem;
+    padding-right: 1rem;
+  }
+
+  .card {
+    margin-bottom: 1rem;
+    border-radius: 8px;
+  }
+
+  .card-body {
+    padding: 1rem;
+  }
+
+  /* Tables readable on mobile */
+  .table {
+    font-size: 0.9rem;
+  }
+
+  .table td,
+  .table th {
+    padding: 0.5rem 0.25rem;
+    white-space: nowrap;
+  }
+
+  h1, .h1 { font-size: 1.75rem; }
+  h2, .h2 { font-size: 1.5rem; }
+  h3, .h3 { font-size: 1.25rem; }
+  h5, .h5 { font-size: 1.1rem; }
+}
