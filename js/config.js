@@ -16,7 +16,8 @@ const CONFIG = {
         PHONE_TYPES: 'phone_store_phone_types',
         ACCESSORY_CATEGORIES: 'phone_store_accessory_categories',
         CURRENT_USER: 'phone_store_current_user',
-        SETTINGS: 'phone_store_settings'
+        SETTINGS: 'phone_store_settings',
+        MAX_USED_PHONE_NUMBER: 'phone_store_max_used_phone_number'
     },
     PHONE_CONDITIONS: {
         excellent: "ممتازة",

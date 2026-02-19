@@ -80,46 +80,53 @@ const IDUtils = {
     },
 
     /**
-     * Generate unique phone number
-     * @param {Array} existingPhones - Array of existing phones
-     * @returns {string} Unique phone number
+     * Generate unique phone number (barcode).
+     * لا يُعاد استخدام رقم باركود بعد استخدامه أبداً (حتى بعد بيع الجهاز)،
+     * حتى لا يظهر استعلام الباركود جهازاً مختلفاً لاحقاً.
+     * @param {Array} existingPhones - Array of existing phones in inventory
+     * @returns {string} Unique phone number (6 digits, zero-padded)
      */
     generateUniquePhoneNumber(existingPhones = []) {
-        // تحويل جميع الأرقام المستخدمة إلى مجموعة (Set) للبحث السريع
-        const existingNumbersSet = new Set();
+        const storageKey = (typeof CONFIG !== 'undefined' && CONFIG.STORAGE_KEYS && CONFIG.STORAGE_KEYS.MAX_USED_PHONE_NUMBER)
+            ? CONFIG.STORAGE_KEYS.MAX_USED_PHONE_NUMBER
+            : 'phone_store_max_used_phone_number';
+
+        // أقصى رقم مستخدم حالياً في المخزون
+        let maxFromExisting = 0;
         existingPhones.forEach(phone => {
             const num = phone.phone_number;
             if (num) {
                 const parsed = parseInt(num, 10);
                 if (!isNaN(parsed) && parsed > 0) {
-                    existingNumbersSet.add(parsed);
+                    if (parsed > maxFromExisting) maxFromExisting = parsed;
                 }
             }
         });
-        
-        // البحث عن أول رقم متاح (إما الرقم التالي أو رقم في فجوة)
-        const maxNumber = existingNumbersSet.size > 0 ? Math.max(...Array.from(existingNumbersSet)) : 0;
-        let nextNumber = maxNumber + 1;
-        
-        // إذا كان الرقم التالي مستخدماً، ابحث عن أول رقم متاح في الفجوات
-        if (existingNumbersSet.has(nextNumber)) {
-            // ابحث عن أول رقم متاح من 1 إلى maxNumber
-            for (let i = 1; i <= maxNumber; i++) {
-                if (!existingNumbersSet.has(i)) {
-                    nextNumber = i;
-                    break;
-                }
+
+        // أقصى رقم تم استخدامه على الإطلاق (من التخزين المحلي) لعدم إعادة استخدام أرقام الأجهزة المباعة
+        let storedMax = 0;
+        try {
+            const stored = typeof localStorage !== 'undefined' && localStorage.getItem(storageKey);
+            if (stored) {
+                const n = parseInt(stored, 10);
+                if (!isNaN(n) && n >= 0) storedMax = n;
             }
-            // إذا لم نجد فجوة، استخدم الرقم التالي
-            if (existingNumbersSet.has(nextNumber)) {
-                nextNumber = maxNumber + 1;
-            }
-        }
-        
+        } catch (e) { /* ignore */ }
+
+        // الرقم التالي = أكبر من (المخزون الحالي) و (آخر رقم مُستخدم) ولا نعيد استخدام الفجوات
+        const nextNumber = Math.max(maxFromExisting, storedMax) + 1;
+
         if (nextNumber > 100000) {
             throw new Error("تم الوصول للحد الأقصى من أرقام الهواتف (100000)");
         }
-        
+
+        // حفظ آخر رقم مستخدم حتى لا يُعاد استخدامه بعد بيع الجهاز
+        try {
+            if (typeof localStorage !== 'undefined') {
+                localStorage.setItem(storageKey, String(nextNumber));
+            }
+        } catch (e) { /* ignore */ }
+
         return String(nextNumber).padStart(6, '0');
     },
 
