@@ -136,7 +136,7 @@ class FirebaseStorageManager {
         return phoneId;
       } catch (error) {
         console.error('Error adding phone to Firebase:', error);
-        return false;
+        throw error;
       }
     }
     
@@ -188,7 +188,25 @@ class FirebaseStorageManager {
 
   async getPhoneByNumber(phoneNumber) {
     const phones = await this.getPhones();
-    return phones.find(p => p.phone_number === phoneNumber);
+    const str = phoneNumber != null ? String(phoneNumber) : '';
+    return phones.find(p => String(p.phone_number || '') === str) || null;
+  }
+
+  /**
+   * الحصول على رقم باركود (phone_number) التالي الفريد من Firebase.
+   * يُستخدم عند إضافة هاتف جديد لضمان عدم التكرار بين الأجهزة أو النوافذ.
+   * @returns {Promise<string|null>} رقم من 6 خانات أو null إذا Firebase غير متاح
+   */
+  async getNextPhoneNumber() {
+    if (!this.isFirebaseAvailable || !this.firebaseDB || typeof this.firebaseDB.getNextPhoneNumber !== 'function') {
+      return null;
+    }
+    try {
+      return await this.firebaseDB.getNextPhoneNumber();
+    } catch (error) {
+      console.error('Error getting next phone number from Firebase:', error);
+      return null;
+    }
   }
 
   async getPhoneBySerial(serialNumber) {

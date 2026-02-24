@@ -375,28 +375,26 @@
     }
 
     async function generatePhoneNumber(){
-      // جلب جميع الهواتف من Firebase أو localStorage للتحقق من الأرقام المستخدمة
+      // عند استخدام Firebase: توليد الرقم من Firestore (عداد مركزي) لضمان التفرد بين جميع الأجهزة والنوافذ
+      if (window.storage && window.storage.isFirebaseAvailable && typeof window.storage.getNextPhoneNumber === 'function') {
+        try {
+          const next = await window.storage.getNextPhoneNumber();
+          if (next) return next;
+        } catch (e) {
+          console.warn('Firebase getNextPhoneNumber failed, using fallback:', e);
+        }
+      }
+      // Fallback: localStorage أو عدم وجود Firebase
       let phones = [];
       try {
-        if(window.storage && window.storage.isFirebaseAvailable){
-          phones = await window.storage.getPhones();
-        } else {
-          phones = JSON.parse(localStorage.getItem('phones') || '[]');
-        }
-      } catch (error) {
-        console.error('خطأ في جلب الهواتف:', error);
+        if (window.storage && window.storage.getPhones) phones = await window.storage.getPhones();
+        else phones = JSON.parse(localStorage.getItem('phones') || '[]');
+      } catch (err) {
         phones = JSON.parse(localStorage.getItem('phones') || '[]');
       }
-      
-      // استخدام IDUtils.generateUniquePhoneNumber مع جميع الهواتف
       const uniqueNumber = IDUtils.generateUniquePhoneNumber(phones);
-      
-      // تحديث lastDeviceNumber في localStorage للتوافق مع الكود القديم
       const numValue = parseInt(uniqueNumber, 10);
-      if (!isNaN(numValue)) {
-        localStorage.setItem('lastDeviceNumber', String(numValue));
-      }
-      
+      if (!isNaN(numValue)) localStorage.setItem('lastDeviceNumber', String(numValue));
       return uniqueNumber;
     }
 
@@ -586,7 +584,7 @@
 
       }catch(err){ 
         console.error(err); 
-        alert('❌ حدث خطأ في حفظ الهاتف.'); 
+        alert(err && err.message ? err.message : '❌ حدث خطأ في حفظ الهاتف.'); 
         setSubmitButtonState(false);
         return false; 
       }

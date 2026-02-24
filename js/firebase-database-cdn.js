@@ -12,7 +12,8 @@ import {
   where, 
   orderBy,
   onSnapshot,
-  serverTimestamp 
+  serverTimestamp,
+  runTransaction
 } from 'https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore.js';
 
 class FirebaseDatabase {
@@ -30,10 +31,50 @@ class FirebaseDatabase {
   }
 
   // ===== إدارة الهواتف =====
+
+  /**
+   * توليد رقم باركود (phone_number) فريد على مستوى المشروع عبر Transaction في Firestore.
+   * يمنع تكرار الرقم بين الأجهزة أو النوافذ المتعددة.
+   * متوافق مع البيانات الحالية: إن لم يكن العداد موجوداً يُستنتج من أقصى phone_number في الهواتف.
+   * @returns {Promise<string>} رقم من 6 خانات مثل "000001"
+   */
+  async getNextPhoneNumber() {
+    if (!this.db) throw new Error('Firebase Database not initialized');
+    let maxFromPhones = 0;
+    try {
+      const phones = await this.getPhones();
+      phones.forEach((p) => {
+        const n = parseInt(p.phone_number, 10);
+        if (!isNaN(n) && n > maxFromPhones) maxFromPhones = n;
+      });
+    } catch (e) { /* ignore */ }
+    const counterRef = doc(this.db, 'counters', 'phones');
+    const nextNum = await runTransaction(this.db, async (transaction) => {
+      const snap = await transaction.get(counterRef);
+      const stored = snap.exists() ? (Number(snap.data().lastNumber) || 0) : 0;
+      const current = Math.max(stored, maxFromPhones);
+      const next = current + 1;
+      if (next > 100000) throw new Error('تم الوصول للحد الأقصى من أرقام الهواتف (100000)');
+      transaction.set(counterRef, { lastNumber: next, updatedAt: serverTimestamp() });
+      return next;
+    });
+    return String(nextNum).padStart(6, '0');
+  }
+
   async addPhone(phoneData) {
     try {
+      const phoneNumberStr = phoneData.phone_number != null ? String(phoneData.phone_number) : '';
+      if (phoneNumberStr) {
+        const q = query(collection(this.db, 'phones'), where('phone_number', '==', phoneNumberStr));
+        const snap = await getDocs(q);
+        if (!snap.empty) {
+          throw new Error('رقم الباركود مستخدم بالفعل في النظام. يرجى تحديث الصفحة والمحاولة مرة أخرى.');
+        }
+      }
+      const dataToSave = { ...phoneData };
+      if (dataToSave.phone_number != null) dataToSave.phone_number = String(dataToSave.phone_number);
       const docRef = await addDoc(collection(this.db, 'phones'), {
-        ...phoneData,
+        ...dataToSave,
         createdAt: serverTimestamp(),
         updatedAt: serverTimestamp()
       });
