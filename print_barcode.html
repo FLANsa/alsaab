@@ -33,13 +33,67 @@
     .card-header h3 { margin:0; font-size:1.1rem; font-weight:700; }
     .card-body { padding:20px; }
     .sticker-preview{ border:2px dashed var(--muted); padding:20px; background:#f9f9f9; border-radius:10px; display:flex; justify-content:center; margin-bottom:18px; }
-    .sticker{ width:6cm; height:3cm; background:#fff; border:1px solid #ddd; box-sizing:border-box; display:flex; flex-direction:column; padding:0.2cm; gap:0.15cm; }
+    .sticker{
+      width:6cm;
+      height:3cm;
+      background:#fff;
+      border:1px solid #ddd;
+      box-sizing:border-box;
+      display:flex;
+      flex-direction:column;
+      padding:0.15cm 0.2cm;
+      gap:0.04cm;
+      overflow:hidden; /* يمنع أي محتوى من الخروج خارج الإطار */
+    }
     .row2{ display:flex; flex-direction:column; align-items:center; text-align:center; width:33.333%; line-height:1.1; }
-    .label{ color:#222; font-weight:700; font-size:3.0mm; line-height:1.1; text-align:center; }
-    .value{ color:#000; font-weight:800; font-size:4.2mm; line-height:1.05; text-align:center; }
-    .shop{ text-align:center; font-weight:700; font-size:4.5mm; line-height:1.1; margin-bottom:0.1cm; }
-    .rows{ display:flex; flex-direction:row; gap:0.1cm; justify-content:space-between; margin-top:-0.2cm; }
-    .sticker-barcode canvas{ width:100%; height:auto; max-height:1.2cm; image-rendering:crisp-edges; image-rendering:pixelated; display:block; }
+    .label{ color:#222; font-weight:700; font-size:2.8mm; line-height:1.05; text-align:center; }
+    .value{ color:#000; font-weight:800; font-size:3.8mm; line-height:1.0; text-align:center; }
+    .shop{ text-align:center; font-weight:700; font-size:3.5mm; line-height:1.1; margin-bottom:0.02cm; }
+    .phone-name{
+      text-align:center;
+      font-weight:600;
+      font-size:3.1mm;
+      line-height:1.1;
+      max-width:100%;
+      white-space:nowrap;
+      overflow:hidden;
+      text-overflow:ellipsis;
+      position:relative;
+      z-index:2; /* أمام الباركود */
+    }
+    .rows{ display:flex; flex-direction:row; gap:0.1cm; justify-content:space-between; margin-top:0; }
+    .barcode-wrapper{
+      position:relative;
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      margin:0.02cm 0;
+    }
+    .sticker-barcode{
+      flex-shrink:0;
+      width:100%;
+    }
+    .barcode-overlay-name{
+      position:absolute;
+      top:50%;
+      left:50%;
+      transform:translate(-50%,-50%);
+      z-index:2;
+      background:rgba(255,255,255,0.85);
+      padding:0.5mm 2mm;
+      font-weight:700;
+      font-size:3.2mm;
+      white-space:nowrap;
+      border-radius:1px;
+    }
+    .sticker-barcode canvas{
+      width:100%;
+      height:auto;
+      max-height:0.9cm;
+      image-rendering:crisp-edges;
+      image-rendering:pixelated;
+      display:block;
+    }
     .actions{ display:flex; gap:10px; flex-wrap:wrap; }
     .btn{ appearance:none; border:0; padding:10px 14px; border-radius:10px; cursor:pointer; font-weight:700; font-family:inherit; }
     .btn-primary{ background:#10b981; color:#fff; }
@@ -64,7 +118,10 @@
         <div class="sticker-preview">
           <div id="sticker" class="sticker">
             <div class="shop">ياسر للاتصالات</div>
-            <div class="sticker-barcode"><canvas id="barcode-canvas"></canvas></div>
+            <div class="barcode-wrapper">
+              <div class="sticker-barcode"><canvas id="barcode-canvas"></canvas></div>
+              <div class="barcode-overlay-name" id="phone-name">—</div>
+            </div>
             <div class="rows">
               <div class="row2">
                 <div class="label">رقم الجهاز</div>
@@ -149,6 +206,11 @@
 
   function valuesFromPhone(phone){
     const phone_number = phone?.phone_number || phone?.barcode || phone?.id || '';
+    const phone_name =
+      phone?.phone_name ||
+      phone?.name ||
+      [phone?.brand || phone?.manufacturer, phone?.model].filter(Boolean).join(' ') ||
+      '';
     const memory = phone?.phone_memory || phone?.memory || phone?.storage || '-';
     // Hide battery for new phones, show for used phones
     let battery = '-';
@@ -159,10 +221,14 @@
     } else if (phone?.age != null) {
       battery = String(phone.age); // تم الحفظ من صفحة المستعمل كـ battery_level أيضاً
     }
-    return { phone_number, memory, battery };
+    return { phone_number, memory, battery, phone_name };
   }
 
-  function fillSticker({phone_number, memory, battery}){
+  function fillSticker({phone_number, memory, battery, phone_name}){
+    const nameEl = document.getElementById('phone-name');
+    if(nameEl){
+      nameEl.textContent = phone_name && String(phone_name).trim() ? phone_name : 'هاتف جوال';
+    }
     document.getElementById('phone-number').textContent = phone_number || '-';
     document.getElementById('phone-memory').textContent = memory || '-';
     
