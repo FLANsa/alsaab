@@ -54,37 +54,17 @@
       font-weight:600;
       font-size:3.1mm;
       line-height:1.1;
+      margin-bottom:0.02cm;
       max-width:100%;
       white-space:nowrap;
       overflow:hidden;
-      text-overflow:ellipsis;
-      position:relative;
-      z-index:2; /* أمام الباركود */
+      text-overflow:ellipsis; /* تقصير الاسم الطويل داخل الإطار */
     }
     .rows{ display:flex; flex-direction:row; gap:0.1cm; justify-content:space-between; margin-top:0; }
-    .barcode-wrapper{
-      position:relative;
-      display:flex;
-      align-items:center;
-      justify-content:center;
-      margin:0.02cm 0;
-    }
     .sticker-barcode{
+      margin-top:0.02cm;
+      margin-bottom:0.02cm;
       flex-shrink:0;
-      width:100%;
-    }
-    .barcode-overlay-name{
-      position:absolute;
-      top:50%;
-      left:50%;
-      transform:translate(-50%,-50%);
-      z-index:2;
-      background:rgba(255,255,255,0.85);
-      padding:0.5mm 2mm;
-      font-weight:700;
-      font-size:3.2mm;
-      white-space:nowrap;
-      border-radius:1px;
     }
     .sticker-barcode canvas{
       width:100%;
@@ -118,10 +98,8 @@
         <div class="sticker-preview">
           <div id="sticker" class="sticker">
             <div class="shop">ياسر للاتصالات</div>
-            <div class="barcode-wrapper">
-              <div class="sticker-barcode"><canvas id="barcode-canvas"></canvas></div>
-              <div class="barcode-overlay-name" id="phone-name">—</div>
-            </div>
+            <div class="phone-name" id="phone-name">—</div>
+            <div class="sticker-barcode"><canvas id="barcode-canvas"></canvas></div>
             <div class="rows">
               <div class="row2">
                 <div class="label">رقم الجهاز</div>
