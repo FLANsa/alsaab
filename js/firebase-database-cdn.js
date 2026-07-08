@@ -16,6 +16,41 @@ import {
   runTransaction
 } from 'https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore.js';
 
+// ===== طبقة كاش محلية لتقليل قراءات Firestore =====
+// كل صفحة كانت تعيد جلب المجموعات كاملة عند كل تحميل/تنقل، مما يستنفد حصة القراءات اليومية.
+// الكاش يخزن نتيجة الجلب في localStorage لمدة CACHE_TTL_MS ويُبطَل فوراً عند أي كتابة على نفس المجموعة.
+const CACHE_TTL_MS = 5 * 60 * 1000; // 5 دقائق - التعديلات من نفس الجهاز تظهر فوراً بفضل الإبطال
+const CACHE_PREFIX = 'fsCache:v1:';
+
+function cacheRead(name) {
+  try {
+    const raw = localStorage.getItem(CACHE_PREFIX + name);
+    if (!raw) return null;
+    const { t, data } = JSON.parse(raw);
+    if (!t || (Date.now() - t) > CACHE_TTL_MS) {
+      localStorage.removeItem(CACHE_PREFIX + name);
+      return null;
+    }
+    console.log(`🗃️ Cache hit: ${name} (${Array.isArray(data) ? data.length : '?'} items, no Firestore reads)`);
+    return data;
+  } catch (e) {
+    return null;
+  }
+}
+
+function cacheWrite(name, data) {
+  try {
+    localStorage.setItem(CACHE_PREFIX + name, JSON.stringify({ t: Date.now(), data }));
+  } catch (e) {
+    // تجاوز حد التخزين المحلي - نتخطى الكاش بصمت
+    try { localStorage.removeItem(CACHE_PREFIX + name); } catch (_) {}
+  }
+}
+
+function cacheInvalidate(name) {
+  try { localStorage.removeItem(CACHE_PREFIX + name); } catch (_) {}
+}
+
 class FirebaseDatabase {
   constructor() {
     // استخدام قاعدة البيانات المربوطة من firebase-config-cdn.js
@@ -79,6 +114,7 @@ class FirebaseDatabase {
         updatedAt: serverTimestamp()
       });
       console.log('✅ Phone added with ID:', docRef.id);
+      cacheInvalidate('phones');
       return docRef.id;
     } catch (error) {
       console.error('❌ Error adding phone:', error);
@@ -88,12 +124,15 @@ class FirebaseDatabase {
 
   async getPhones() {
     try {
+      const cached = cacheRead('phones');
+      if (cached) return cached;
       const phonesSnapshot = await getDocs(collection(this.db, 'phones'));
       const phones = [];
       phonesSnapshot.forEach((doc) => {
         phones.push({ id: doc.id, ...doc.data() });
       });
       console.log('📱 Retrieved phones:', phones.length);
+      cacheWrite('phones', phones);
       return phones;
     } catch (error) {
       console.error('❌ Error getting phones:', error);
@@ -108,6 +147,7 @@ class FirebaseDatabase {
         updatedAt: serverTimestamp()
       });
       console.log('✅ Phone updated:', phoneId);
+      cacheInvalidate('phones');
     } catch (error) {
       console.error('❌ Error updating phone:', error);
       throw error;
@@ -118,6 +158,7 @@ class FirebaseDatabase {
     try {
       await deleteDoc(doc(this.db, 'phones', phoneId));
       console.log('✅ Phone deleted:', phoneId);
+      cacheInvalidate('phones');
     } catch (error) {
       console.error('❌ Error deleting phone:', error);
       throw error;
@@ -136,6 +177,7 @@ class FirebaseDatabase {
       });
       
       console.log('✅ Firebase: تم إضافة الأكسسوار بنجاح! ID:', docRef.id);
+      cacheInvalidate('accessories');
       console.log('📂 Firebase: الفئة المحفوظة:', accessoryData.category);
       return docRef.id;
     } catch (error) {
@@ -146,12 +188,15 @@ class FirebaseDatabase {
 
   async getAccessories() {
     try {
+      const cached = cacheRead('accessories');
+      if (cached) return cached;
       const accessoriesSnapshot = await getDocs(collection(this.db, 'accessories'));
       const accessories = [];
       accessoriesSnapshot.forEach((doc) => {
         accessories.push({ id: doc.id, ...doc.data() });
       });
       console.log('🛍️ Retrieved accessories:', accessories.length);
+      cacheWrite('accessories', accessories);
       return accessories;
     } catch (error) {
       console.error('❌ Error getting accessories:', error);
@@ -166,6 +211,7 @@ class FirebaseDatabase {
         updatedAt: serverTimestamp()
       });
       console.log('✅ Accessory updated:', accessoryId);
+      cacheInvalidate('accessories');
     } catch (error) {
       console.error('❌ Error updating accessory:', error);
       throw error;
@@ -176,6 +222,7 @@ class FirebaseDatabase {
     try {
       await deleteDoc(doc(this.db, 'accessories', accessoryId));
       console.log('✅ Accessory deleted:', accessoryId);
+      cacheInvalidate('accessories');
     } catch (error) {
       console.error('❌ Error deleting accessory:', error);
       throw error;
@@ -191,6 +238,7 @@ class FirebaseDatabase {
         updatedAt: serverTimestamp()
       });
       console.log('✅ Sale added with ID:', docRef.id);
+      cacheInvalidate('sales');
       return docRef.id;
     } catch (error) {
       console.error('❌ Error adding sale:', error);
@@ -200,6 +248,8 @@ class FirebaseDatabase {
 
   async getSales() {
     try {
+      const cached = cacheRead('sales');
+      if (cached) return cached;
       const salesSnapshot = await getDocs(
         query(collection(this.db, 'sales'), orderBy('createdAt', 'desc'))
       );
@@ -208,6 +258,7 @@ class FirebaseDatabase {
         sales.push({ id: doc.id, ...doc.data() });
       });
       console.log('💰 Retrieved sales:', sales.length);
+      cacheWrite('sales', sales);
       return sales;
     } catch (error) {
       console.error('❌ Error getting sales:', error);
@@ -235,6 +286,7 @@ class FirebaseDatabase {
         updatedAt: serverTimestamp()
       });
       console.log('✅ Sale updated:', saleId);
+      cacheInvalidate('sales');
     } catch (error) {
       console.error('❌ Error updating sale:', error);
       throw error;
@@ -245,6 +297,7 @@ class FirebaseDatabase {
     try {
       await deleteDoc(doc(this.db, 'sales', saleId));
       console.log('✅ Sale deleted:', saleId);
+      cacheInvalidate('sales');
     } catch (error) {
       console.error('❌ Error deleting sale:', error);
       throw error;
@@ -260,6 +313,7 @@ class FirebaseDatabase {
         updatedAt: serverTimestamp()
       });
       console.log('✅ Category added with ID:', docRef.id);
+      cacheInvalidate('accessory_categories');
       return docRef.id;
     } catch (error) {
       console.error('❌ Error adding category:', error);
@@ -269,12 +323,15 @@ class FirebaseDatabase {
 
   async getAccessoryCategories() {
     try {
+      const cached = cacheRead('accessory_categories');
+      if (cached) return cached;
       const categoriesSnapshot = await getDocs(collection(this.db, 'accessory_categories'));
       const categories = [];
       categoriesSnapshot.forEach((doc) => {
         categories.push({ id: doc.id, ...doc.data() });
       });
       console.log('📂 Retrieved categories:', categories.length);
+      cacheWrite('accessory_categories', categories);
       return categories;
     } catch (error) {
       console.error('❌ Error getting categories:', error);
@@ -296,6 +353,7 @@ class FirebaseDatabase {
       
       await Promise.all(deletePromises);
       console.log('✅ Accessory category deleted:', categoryName);
+      cacheInvalidate('accessory_categories');
       return true;
     } catch (error) {
       console.error('❌ Error deleting accessory category:', error);
@@ -312,6 +370,7 @@ class FirebaseDatabase {
         updatedAt: serverTimestamp()
       });
       console.log('✅ Phone type added with ID:', docRef.id);
+      cacheInvalidate('phone_types');
       return docRef.id;
     } catch (error) {
       console.error('❌ Error adding phone type:', error);
@@ -321,12 +380,15 @@ class FirebaseDatabase {
 
   async getPhoneTypes() {
     try {
+      const cached = cacheRead('phone_types');
+      if (cached) return cached;
       const phoneTypesSnapshot = await getDocs(collection(this.db, 'phone_types'));
       const phoneTypes = [];
       phoneTypesSnapshot.forEach((doc) => {
         phoneTypes.push({ id: doc.id, ...doc.data() });
       });
       console.log('📱 Retrieved phone types:', phoneTypes.length);
+      cacheWrite('phone_types', phoneTypes);
       return phoneTypes;
     } catch (error) {
       console.error('❌ Error getting phone types:', error);
@@ -349,6 +411,7 @@ class FirebaseDatabase {
       
       await Promise.all(deletePromises);
       console.log('✅ Phone type deleted:', brand, model);
+      cacheInvalidate('phone_types');
       return true;
     } catch (error) {
       console.error('❌ Error deleting phone type:', error);
@@ -455,6 +518,7 @@ class FirebaseDatabase {
         updatedAt: serverTimestamp()
       });
       console.log('✅ Rep added with ID:', docRef.id);
+      cacheInvalidate('reps');
       return docRef.id;
     } catch (error) {
       console.error('❌ Error adding rep:', error);
@@ -464,12 +528,15 @@ class FirebaseDatabase {
 
   async getReps() {
     try {
+      const cached = cacheRead('reps');
+      if (cached) return cached;
       const querySnapshot = await getDocs(collection(this.db, 'reps'));
       const reps = [];
       querySnapshot.forEach(doc => {
         reps.push({ id: doc.id, ...doc.data() });
       });
       console.log('✅ Reps loaded:', reps.length);
+      cacheWrite('reps', reps);
       return reps;
     } catch (error) {
       console.error('❌ Error getting reps:', error);
@@ -485,6 +552,7 @@ class FirebaseDatabase {
         updatedAt: serverTimestamp()
       });
       console.log('✅ Rep updated:', repId);
+      cacheInvalidate('reps');
     } catch (error) {
       console.error('❌ Error updating rep:', error);
       throw error;
@@ -496,6 +564,7 @@ class FirebaseDatabase {
       const repRef = doc(this.db, 'reps', repId);
       await deleteDoc(repRef);
       console.log('✅ Rep deleted:', repId);
+      cacheInvalidate('reps');
     } catch (error) {
       console.error('❌ Error deleting rep:', error);
       throw error;
@@ -513,6 +582,7 @@ class FirebaseDatabase {
         updatedAt: serverTimestamp()
       });
       console.log('✅ Technician added with ID:', docRef.id);
+      cacheInvalidate('technicians');
       return docRef.id;
     } catch (error) {
       console.error('❌ Error adding technician:', error);
@@ -522,12 +592,15 @@ class FirebaseDatabase {
 
   async getTechnicians() {
     try {
+      const cached = cacheRead('technicians');
+      if (cached) return cached;
       const querySnapshot = await getDocs(collection(this.db, 'technicians'));
       const technicians = [];
       querySnapshot.forEach(doc => {
         technicians.push({ id: doc.id, ...doc.data() });
       });
       console.log('✅ Technicians loaded:', technicians.length);
+      cacheWrite('technicians', technicians);
       return technicians;
     } catch (error) {
       console.error('❌ Error getting technicians:', error);
@@ -543,6 +616,7 @@ class FirebaseDatabase {
         updatedAt: serverTimestamp()
       });
       console.log('✅ Technician updated:', techId);
+      cacheInvalidate('technicians');
     } catch (error) {
       console.error('❌ Error updating technician:', error);
       throw error;
@@ -554,6 +628,7 @@ class FirebaseDatabase {
       const techRef = doc(this.db, 'technicians', techId);
       await deleteDoc(techRef);
       console.log('✅ Technician deleted:', techId);
+      cacheInvalidate('technicians');
     } catch (error) {
       console.error('❌ Error deleting technician:', error);
       throw error;
@@ -591,6 +666,7 @@ class FirebaseDatabase {
         updatedAt: serverTimestamp()
       });
       console.log('✅ Maintenance job added with ID:', docRef.id);
+      cacheInvalidate('maintenanceJobs');
       console.log('💰 Calculated values - totalPartCost:', totalPartCost, 'profit:', profit, 'techCommission:', techCommission);
       return docRef.id;
     } catch (error) {
@@ -601,6 +677,12 @@ class FirebaseDatabase {
 
   async getMaintenanceJobs(filters = {}) {
     try {
+      // الكاش للجلب غير المفلتر فقط - الاستعلامات المفلترة تختلف مفاتيحها
+      const isUnfiltered = !filters || Object.keys(filters).length === 0;
+      if (isUnfiltered) {
+        const cached = cacheRead('maintenanceJobs');
+        if (cached) return cached;
+      }
       let q = collection(this.db, 'maintenanceJobs');
       
       // إذا كان هناك status و date range معاً، نحاول الاستعلام معاً أولاً
@@ -759,8 +841,9 @@ class FirebaseDatabase {
           const dateB = b.visitDate?.seconds ? new Date(b.visitDate.seconds * 1000) : new Date(b.visitDate);
           return dateB - dateA; // ترتيب تنازلي
         });
-        
+
         console.log('✅ Maintenance jobs loaded:', jobs.length);
+        if (isUnfiltered) cacheWrite('maintenanceJobs', jobs);
         return jobs;
       }
     } catch (error) {
@@ -821,6 +904,7 @@ class FirebaseDatabase {
         updatedAt: serverTimestamp()
       });
       console.log('✅ Maintenance job updated:', jobId);
+      cacheInvalidate('maintenanceJobs');
     } catch (error) {
       console.error('❌ Error updating maintenance job:', error);
       throw error;
@@ -847,6 +931,7 @@ class FirebaseDatabase {
       const jobRef = doc(this.db, 'maintenanceJobs', jobId);
       await deleteDoc(jobRef);
       console.log('✅ Maintenance job deleted:', jobId);
+      cacheInvalidate('maintenanceJobs');
     } catch (error) {
       console.error('❌ Error deleting maintenance job:', error);
       throw error;
@@ -1230,6 +1315,8 @@ class FirebaseDatabase {
   // ===== تهيئة البيانات الافتراضية =====
   async initializeDefaultData() {
     try {
+      // البذر مطلوب مرة واحدة فقط - قبل هذا الحارس كانت كل صفحة تقرأ مجموعة الفئات كاملة عند كل تحميل
+      if (localStorage.getItem('fsSeedChecked:v1')) return;
       // تهيئة فئات الأكسسوارات
       const defaultCategories = [
         { name: 'accessory', arabic_name: 'إكسسوار', description: 'إكسسوارات عامة' },
@@ -1250,6 +1337,7 @@ class FirebaseDatabase {
         console.log('✅ تم إضافة فئات الأكسسوارات الافتراضية');
       }
 
+      localStorage.setItem('fsSeedChecked:v1', '1');
       console.log('✅ Default data initialized successfully');
     } catch (error) {
       console.error('❌ Error initializing default data:', error);
